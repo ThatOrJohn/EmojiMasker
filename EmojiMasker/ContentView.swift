@@ -2,7 +2,8 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var cameraManager = CameraManager()
-    @State private var showToast: Bool = false // Control toast visibility
+    @State private var showToast: Bool = false
+    @State private var explosions: [Explosion] = []
     
     var body: some View {
         ZStack {
@@ -16,9 +17,21 @@ struct ContentView: View {
                         .font(.system(size: rect.width * 1.8))
                         .position(x: rect.midX, y: rect.midY)
                 }
+                
+                ForEach(explosions) { explosion in
+                    ExplosionView()
+                        .position(explosion.position)
+                        .id(explosion.id)
+                }
+            }
+            .onTapGesture { location in
+                let newExplosion = Explosion(id: UUID(), position: location)
+                explosions.append(newExplosion)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    explosions.removeAll { $0.id == newExplosion.id }
+                }
             }
             
-            // Toast overlay
             if showToast, let message = cameraManager.cameraSwitchMessage {
                 VStack {
                     Text(message)
@@ -51,12 +64,11 @@ struct ContentView: View {
         .onDisappear {
             cameraManager.stopSession()
         }
-        .onChange(of: cameraManager.cameraSwitchMessage) { newValue in
+        .onChange(of: cameraManager.cameraSwitchMessage) { _, newValue in
             if newValue != nil {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     showToast = true
                 }
-                // Hide toast after 2 seconds
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         showToast = false
@@ -79,6 +91,37 @@ struct ContentView: View {
             let width = box.width * size.width
             let height = box.height * size.height
             return CGRect(x: x, y: y, width: width, height: height)
+        }
+    }
+}
+
+struct Explosion: Identifiable {
+    let id: UUID
+    let position: CGPoint
+}
+
+struct ExplosionView: View {
+    @State private var scale: CGFloat = 0.1
+    @State private var opacity: Double = 1.0
+    
+    var body: some View {
+        ZStack {
+            Text("💥")
+                .font(.system(size: 50))
+                .scaleEffect(scale)
+                .rotationEffect(.degrees(scale * 180))
+                .opacity(opacity)
+            Text("🔥")
+                .font(.system(size: 30))
+                .scaleEffect(scale * 0.8)
+                .rotationEffect(.degrees(-scale * 90))
+                .opacity(opacity)
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.8)) {
+                scale = 2.0
+                opacity = 0.0
+            }
         }
     }
 }
